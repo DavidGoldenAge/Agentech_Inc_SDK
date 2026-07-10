@@ -10,8 +10,8 @@ This package uses one README at the package level. English and Chinese card inde
 
 | Language | L0.0 card | L0.5 cards |
 | --- | --- | --- |
-| English | `../L0.0/cards/get_battery_status.en.md` | `cards/en/` |
-| Chinese | `../L0.0/cards/get_battery_status.zh.md` | `cards/zh/` |
+| English | `../README.en.md` | `cards/en/` |
+| Chinese | `../README.zh.md` | `cards/zh/` |
 
 ## Card Index
 

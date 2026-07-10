@@ -20,8 +20,8 @@ Language entry points:
 
 | Language | Entry | Includes |
 | --- | --- | --- |
-| English | `L0.5/README.md` | English L0.5 card index plus the English L0.0 telemetry card |
-| Chinese | `L0.5/README.md` | Chinese L0.5 card index plus the Chinese L0.0 telemetry card |
+| English | `README.en.md` | English L0.0 and L0.5 card index |
+| Chinese | `README.zh.md` | Chinese L0.0 and L0.5 card index |
 
 ## SDK Philosophy
 
@@ -60,6 +60,8 @@ Agentech SDK uses level folders to keep responsibility boundaries explicit.
 | `L0.5/README.md` | L0.5 package index |
 | `L0.5/cards/en/` | English L0.5 cards |
 | `L0.5/cards/zh/` | Chinese L0.5 cards |
+| `README.en.md` | English reading entry |
+| `README.zh.md` | Chinese reading entry |
 | `manifest.json` | Repository-level card index |
 | `version history.md` | Version history |
 
