@@ -16,12 +16,7 @@ Current version: `0.2.0`
 | `L0.0` | 1 | Direct telemetry snapshot reads | `L0.0/` |
 | `L0.5` | 12 | Bounded atomic movement, posture, safety, and sensing/posture skills | `L0.5/` |
 
-Language entry points:
-
-| Language | Entry | Includes |
-| --- | --- | --- |
-| English | `README.en.md` | English L0.0 and L0.5 card index |
-| Chinese | `README.zh.md` | Chinese L0.0 and L0.5 card index |
+English and Chinese cards are indexed in this README. Card files stay inside the layer folders.
 
 ## SDK Philosophy
 
@@ -60,10 +55,46 @@ Agentech SDK uses level folders to keep responsibility boundaries explicit.
 | `L0.5/README.md` | L0.5 package index |
 | `L0.5/cards/en/` | English L0.5 cards |
 | `L0.5/cards/zh/` | Chinese L0.5 cards |
-| `README.en.md` | English reading entry |
-| `README.zh.md` | Chinese reading entry |
 | `manifest.json` | Repository-level card index |
 | `version history.md` | Version history |
+
+## Card Index
+
+English:
+
+| # | API | Category | Card |
+| ---: | --- | --- | --- |
+| L0.0 | `Agentech.get_battery_status(parameters)` | Telemetry | `L0.0/cards/get_battery_status.en.md` |
+| 01 | `Agentech.forward(parameters)` | Movement | `L0.5/cards/en/01_forward.md` |
+| 02 | `Agentech.backward(parameters)` | Movement | `L0.5/cards/en/02_backward.md` |
+| 03 | `Agentech.lateral(parameters)` | Movement | `L0.5/cards/en/03_lateral.md` |
+| 04 | `Agentech.turn(parameters)` | Movement | `L0.5/cards/en/04_turn.md` |
+| 05 | `Agentech.twist(parameters)` | Movement | `L0.5/cards/en/05_twist.md` |
+| 06 | `Agentech.backflip(parameters)` | Movement | `L0.5/cards/en/06_backflip.md` |
+| 07 | `Agentech.jump(parameters)` | Movement | `L0.5/cards/en/07_jump.md` |
+| 08 | `Agentech.stand(parameters)` | Posture | `L0.5/cards/en/08_stand.md` |
+| 09 | `Agentech.sit(parameters)` | Posture | `L0.5/cards/en/09_sit.md` |
+| 10 | `Agentech.stop(parameters)` | Safety | `L0.5/cards/en/10_stop.md` |
+| 11 | `Agentech.emergency_stop(parameters)` | Safety | `L0.5/cards/en/11_emergency_stop.md` |
+| 12 | `Agentech.look(parameters)` | Sensing/Posture | `L0.5/cards/en/12_look.md` |
+
+中文：
+
+| # | API | 类别 | 卡片 |
+| ---: | --- | --- | --- |
+| L0.0 | `Agentech.get_battery_status(parameters)` | 遥测 | `L0.0/cards/get_battery_status.zh.md` |
+| 01 | `Agentech.forward(parameters)` | 移动 | `L0.5/cards/zh/01_forward.md` |
+| 02 | `Agentech.backward(parameters)` | 移动 | `L0.5/cards/zh/02_backward.md` |
+| 03 | `Agentech.lateral(parameters)` | 移动 | `L0.5/cards/zh/03_lateral.md` |
+| 04 | `Agentech.turn(parameters)` | 移动 | `L0.5/cards/zh/04_turn.md` |
+| 05 | `Agentech.twist(parameters)` | 移动 | `L0.5/cards/zh/05_twist.md` |
+| 06 | `Agentech.backflip(parameters)` | 移动 | `L0.5/cards/zh/06_backflip.md` |
+| 07 | `Agentech.jump(parameters)` | 移动 | `L0.5/cards/zh/07_jump.md` |
+| 08 | `Agentech.stand(parameters)` | 姿态 | `L0.5/cards/zh/08_stand.md` |
+| 09 | `Agentech.sit(parameters)` | 姿态 | `L0.5/cards/zh/09_sit.md` |
+| 10 | `Agentech.stop(parameters)` | 安全 | `L0.5/cards/zh/10_stop.md` |
+| 11 | `Agentech.emergency_stop(parameters)` | 安全 | `L0.5/cards/zh/11_emergency_stop.md` |
+| 12 | `Agentech.look(parameters)` | 感知/姿态 | `L0.5/cards/zh/12_look.md` |
 
 ## Card Anatomy
 
