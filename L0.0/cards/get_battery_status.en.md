@@ -61,6 +61,10 @@ Agentech.get_battery_status(timeout_s: float)
 `timeout_s` controls how long the SDK waits for the telemetry response.
 
 The upstream source is ZSL-1 `getBatteryPower()`. Per-motor voltage or temperature flags must not be presented as battery-pack telemetry.
+
+### Reserved TBD fields
+
+`voltage_v`, `current_a`, `temperature_c`, and `is_charging` remain in the SDK design as `TBD`. ZSL-1 `getBatteryPower()` does not provide them, so they are not returned and must not be synthesized by a simulator. A future `fields` request containing one of them must return `rejected(E_TBD_PARAMETER)` until an authoritative source is defined.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->

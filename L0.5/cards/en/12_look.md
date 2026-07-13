@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Sensing/Posture** — Adjust body or camera pitch so the robot looks up or down.
+**L0.5 · Posture** — Preserve the Agentech `look` API name while applying a bounded body-pitch rate through ZSL-1 `attitudeControl`.
 
-This posture/sensing-orientation command changes the observation direction.
+ZSL-1 documents body attitude rate control but no camera-pitch actuator or absolute look-angle command. Only the body-rate form is currently executable; the existing unsupported forms remain documented as `TBD`.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -13,68 +13,51 @@ This posture/sensing-orientation command changes the observation direction.
 
 ```python
 Agentech.look(direction: str)
-Agentech.look(direction: str, angle_deg: float, pitch_rate_rad_s: float)
-Agentech.look(target: str, direction: str, angle_deg: float)
-Agentech.look(direction: str, angle_percent: int)
-Agentech.look(direction: str, look_level: int)
+Agentech.look(target: str, direction: str, pitch_rate_rad_s: float, duration_s: float)
+Agentech.look(target: str, direction: str, pitch_rate_rad_s: float, duration_s: float, hold_s: float, return_to_neutral: bool)
 ```
 <!-- END: Syntax -->
 
 <!-- START: Constraints -->
 ## Constraints
 
-1. `direction` is required and must be `"up"` or `"down"`.
-2. `target` defaults to `"auto"` and may be `"body"` or `"camera"`.
-3. Each call may use at most one selector: `angle_deg`, `angle_percent`, or `look_level`.
-4. Unsupported `target` values for the device return `rejected(E_UNSUPPORTED)`.
+1. `direction` is `"up"` or `"down"`; `pitch_rate_rad_s` is a positive magnitude.
+2. The only executable target is `target="body"`. `"auto"` and `"camera"` remain `TBD`.
+3. The executable form accepts rate and duration only; ZSL-1 does not document absolute body-pitch limits.
+4. `return_to_neutral=True` means an equal-duration inverse-rate command, not closed-loop absolute-pose recovery.
+5. ZSL-1 `attitudeControl` may be entered only from standing state.
+6. Robot and simulator backends must execute the same `attitudeControl` command sequence.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
-| --- | --- |
-| `Agentech.look(direction=...)` | Equivalent to `Agentech.look(target="auto", direction=..., angle_deg=10, pitch_rate_rad_s=0.12)` |
-| `Agentech.look(direction=..., angle_deg=...)` | `target` defaults to `"auto"`; `pitch_rate_rad_s` defaults to `0.12` |
-| `Agentech.look(target=..., direction=...)` | `angle_deg` defaults to `10`; `pitch_rate_rad_s` defaults to `0.12` |
-| `Agentech.look(direction=..., angle_percent=...)` | `target` defaults to `"auto"` |
-| `Agentech.look(direction=..., look_level=...)` | `target` defaults to `"auto"` |
+`Agentech.look(direction=...)` resolves to `target="body"`, `pitch_rate_rad_s=0.2`, `duration_s=0.5`, `hold_s=0.0`, and `return_to_neutral=True`.
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-### Parameter Profiles
+| Parameter | Default | Range / values |
+| --- | ---: | --- |
+| `target` | `"body"` | currently only `"body"` |
+| `direction` | required | `"up"` or `"down"` |
+| `pitch_rate_rad_s` | `0.2` | `0.02 <= pitch_rate_rad_s <= 0.2` |
+| `duration_s` | `0.5` | `0 < duration_s <= 2.0` |
+| `hold_s` | `0.0` | `0 <= hold_s <= 3.0` |
+| `return_to_neutral` | `True` | boolean |
 
-| Profile | Selector | Auxiliary / Default | Range / Rule |
-| --- | --- | --- | --- |
-| direction | - | `direction` required | `"up"` or `"down"` |
-| target | - | `target="auto"` | `"auto"`, `"body"`, or `"camera"` |
-| angle-rate | `angle_deg` | `pitch_rate_rad_s=0.12` | `0 < angle_deg <= 25`; `0.03 <= pitch_rate_rad_s <= 0.5` |
-| percent-angle | `angle_percent` | - | `1 <= angle_percent <= 100`, relative to `25 deg` |
-| level | `look_level` | - | `look_level` is `1`, `2`, `3`, `4`, or `5` |
+In the documented body frame (`X` forward, `Y` left, `Z` up), right-hand-rule positive pitch moves the nose down; therefore down is positive and up is negative. The upstream pitch-rate envelope is `-0.5..+0.5 rad/s`; Agentech publishes the narrower `0.02..0.2 rad/s` magnitude range.
 
-### Parameter Notes
+### Reserved TBD parameters
 
-`target="auto"` lets the SDK select body or camera based on device capability.
-
-`angle_deg` is the pitch adjustment angle. `angle_percent=100` maps to `25 deg`.
-
-| `look_level` | Angle |
-| --- | --- |
-| `1` | `5 deg` |
-| `2` | `10 deg` |
-| `3` | `15 deg` |
-| `4` | `20 deg` |
-| `5` | `25 deg` |
-
-`look` adjusts observation direction. Image capture belongs to capture APIs.
+`target="auto"`, `target="camera"`, `angle_deg`, `angle_percent`, and `look_level` remain `TBD`. Passing one currently returns `rejected(E_TBD_PARAMETER)` before command emission; no range or simulated behavior may be invented for them.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK selects the target actuator and adjusts the chosen `target` toward `direction` by the requested pitch angle.
+For the body target, down sends `attitudeControl(0, +rate, 0, 0)` and up sends `attitudeControl(0, -rate, 0, 0)` for `duration_s`, followed by zeros. After `hold_s`, `return_to_neutral=True` sends the opposite signed rate for the same duration and then zeros. Simulation uses the identical sequence.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -84,12 +67,7 @@ The SDK selects the target actuator and adjusts the chosen `target` toward `dire
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+`status` is `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"`. Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric code remains in the command trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
@@ -97,9 +75,7 @@ SkillResult(status, trace_id, error_code, message)
 
 ```python
 result = Agentech.look(direction="up")
-result = Agentech.look(direction="down", angle_deg=15, pitch_rate_rad_s=0.12)
-result = Agentech.look(target="camera", direction="up", angle_deg=10)
-result = Agentech.look(direction="down", angle_percent=60)
-result = Agentech.look(direction="up", look_level=2)
+result = Agentech.look(target="body", direction="down", pitch_rate_rad_s=0.1, duration_s=1.0)
+result = Agentech.look(target="body", direction="up", pitch_rate_rad_s=0.15, duration_s=0.5, hold_s=1.0, return_to_neutral=True)
 ```
 <!-- END: Example -->

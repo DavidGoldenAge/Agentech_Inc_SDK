@@ -1,6 +1,6 @@
 {
   "name": "Agentech_Inc_SDK",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "level_format": "L<integer>.<single decimal>",
   "level_sequence": [
     "L0.0",

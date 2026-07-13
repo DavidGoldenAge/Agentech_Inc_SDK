@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Posture** — Put the Aegis robot dog into floor-sit damping posture and optionally hold for a stabilization window.
+**L0.5 · Posture** — Preserve the Agentech `sit` API name as a compatibility wrapper for the parameterless ZSL-1 `lieDown()` posture transition.
 
-This posture command transitions the robot from standing or motion-ready state into sit/damping state.
+This is a normal posture command. It is intentionally separate from ZSL-1 `passive()`, which is used by `emergency_stop`.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -13,7 +13,6 @@ This posture command transitions the robot from standing or motion-ready state i
 
 ```python
 Agentech.sit()
-Agentech.sit(mode: str)
 Agentech.sit(stabilize_s: float)
 ```
 <!-- END: Syntax -->
@@ -21,40 +20,33 @@ Agentech.sit(stabilize_s: float)
 <!-- START: Constraints -->
 ## Constraints
 
-1. `mode` must be an approved mode.
-2. `stabilize_s` is post-transition wait time, not sit timeout.
-3. If the current posture cannot safely transition to sit, return `rejected(E_NOT_READY)` or the relevant safety error.
+1. The current supported form always calls `lieDown()` with no arguments.
+2. ZSL-1 does not allow direct entry into `lieDown()` while moving; callers must stop first.
+3. `stabilize_s` is a host wait and is never forwarded to `lieDown()`.
+4. The implementation must not substitute `passive()` for `lieDown()`.
+5. Upstream state-transition rejection is returned without automatic retry.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
-| --- | --- |
-| `Agentech.sit()` | Equivalent to `Agentech.sit(mode="damping", stabilize_s=2.0)` |
-| `Agentech.sit(mode=...)` | `stabilize_s` defaults to `2.0` |
-| `Agentech.sit(stabilize_s=...)` | `mode` defaults to `"damping"` |
+`Agentech.sit()` is equivalent to `Agentech.sit(stabilize_s=3.0)`. The `3.0 s` wrapper wait follows the upstream demo sequence; it is not a `lieDown()` parameter or measured transition time.
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-| Parameter | Default | Range / Rule | Description |
-| --- | --- | --- | --- |
-| `mode` | `"damping"` | approved modes | Sit/damping mode. |
-| `stabilize_s` | `2.0` | `0 <= stabilize_s <= 10.0` | Stable wait time after posture transition. |
+| Parameter | Default | Range | Meaning |
+| --- | ---: | --- | --- |
+| `stabilize_s` | `3.0` | `0 <= stabilize_s <= 10.0` | Host-side wait after an accepted `lieDown()` request. |
 
-### Parameter Notes
-
-`mode="damping"` enters sit damping state to reduce subsequent motion output.
-
-`stabilize_s` is a wait window. It does not replace posture state validation.
+The previously designed `mode` parameter remains `TBD`; ZSL-1 `lieDown()` has no mode input. Passing `mode` currently returns `rejected(E_TBD_PARAMETER)` before any posture command is emitted.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK requests sit/damping posture, waits for posture transition, then holds for `stabilize_s`.
+The robot backend compiles `sit()` to a parameterless `lieDown()` call and records the return code. If accepted, it waits `stabilize_s`. The simulator emits the same `lieDown` event and applies the same host wait.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -64,12 +56,7 @@ The SDK requests sit/damping posture, waits for posture transition, then holds f
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric code remains in the trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
@@ -77,7 +64,6 @@ SkillResult(status, trace_id, error_code, message)
 
 ```python
 result = Agentech.sit()
-result = Agentech.sit(mode="damping")
-result = Agentech.sit(stabilize_s=2.0)
+result = Agentech.sit(stabilize_s=3.0)
 ```
 <!-- END: Example -->

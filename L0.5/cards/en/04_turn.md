@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Movement** — Rotate the Aegis robot dog left or right in place, then stop.
+**L0.5 · Movement** — Send a bounded locomotion yaw-rate command to turn left or right, then send the zero-motion command.
 
-The function scope is an open-loop rotation action. The SDK issues a turn command from angle, duration, or level parameters.
+The angle form is open-loop time integration of ZSL-1 `move(0, 0, yaw_rate)`; it is not closed-loop heading control.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -14,9 +14,6 @@ The function scope is an open-loop rotation action. The SDK issues a turn comman
 ```python
 Agentech.turn(direction: str)
 Agentech.turn(direction: str, angle_deg: float, yaw_rate_rad_s: float)
-Agentech.turn(direction: str, angle_percent: int)
-Agentech.turn(direction: str, turn_level: int)
-Agentech.turn(direction: str, quarter_turns: int)
 Agentech.turn(direction: str, duration_s: float, yaw_rate_rad_s: float)
 ```
 <!-- END: Syntax -->
@@ -24,62 +21,44 @@ Agentech.turn(direction: str, duration_s: float, yaw_rate_rad_s: float)
 <!-- START: Constraints -->
 ## Constraints
 
-1. `direction` is required and must be `"left"` or `"right"`; it is not a profile selector.
-2. Each call may use at most one selector: `angle_deg`, `angle_percent`, `turn_level`, `quarter_turns`, or `duration_s`.
-3. `yaw_rate_rad_s` is auxiliary and may only be used with `angle_deg` or `duration_s`.
-4. Out-of-range values return `rejected(E_RANGE)`; mixed profiles return `rejected(E_PROFILE_MIXED)`.
-5. Every turn attempts controlled stop; emergency stop state takes precedence.
+1. `direction` is `"left"` or `"right"`; `yaw_rate_rad_s` is a positive magnitude.
+2. Use `angle_deg` or `duration_s`, never both.
+3. For an angle call, `duration_s = radians(angle_deg) / yaw_rate_rad_s` and must not exceed `10.0 s`.
+4. Out-of-range values return `rejected(E_RANGE)`; the SDK does not clamp them.
+5. ZSL-1 `move` may be entered only from standing state.
+6. The same resolver and signed yaw-rate command must be used by robot and simulator backends.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
+| Call | Deterministic resolution |
 | --- | --- |
-| `Agentech.turn(direction=...)` | Equivalent to `Agentech.turn(direction=..., angle_deg=45, yaw_rate_rad_s=0.35)` |
-| `Agentech.turn(direction=..., angle_deg=...)` | `yaw_rate_rad_s` defaults to `0.35` |
-| `Agentech.turn(direction=..., duration_s=...)` | `yaw_rate_rad_s` defaults to `0.35` |
-| `Agentech.turn(direction=..., angle_percent=...)` | Angle is computed as a percent of `360 deg` |
-| `Agentech.turn(direction=..., quarter_turns=...)` | Each quarter turn is `90 deg` |
+| `Agentech.turn(direction=...)` | `angle_deg=45.0`, `yaw_rate_rad_s=1.0`; duration = `pi/4 s` |
+| Angle or duration without yaw rate | `yaw_rate_rad_s=1.0` |
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-### Parameter Profiles
+| Parameter | Range / values | Meaning |
+| --- | --- | --- |
+| `direction` | `"left"`, `"right"` | left = positive yaw; right = negative yaw |
+| `angle_deg` | `0 < angle_deg <= 360.0` | open-loop requested angle |
+| `duration_s` | `0 < duration_s <= 10.0` | direct command duration |
+| `yaw_rate_rad_s` | `0.02 <= yaw_rate_rad_s <= 1.0` | yaw-rate magnitude |
 
-| Profile | Selector | Auxiliary / Default | Range / Rule |
-| --- | --- | --- | --- |
-| direction | - | `direction` required | `"left"` or `"right"` |
-| angle-rate | `angle_deg` | `yaw_rate_rad_s=0.35` | `0 < angle_deg <= 360`; `0.05 <= yaw_rate_rad_s <= 2.09` |
-| percent-angle | `angle_percent` | - | `1 <= angle_percent <= 100`, relative to `360 deg` |
-| level | `turn_level` | - | `turn_level` is `1`, `2`, `3`, `4`, or `5` |
-| quarter-turns | `quarter_turns` | - | `1 <= quarter_turns <= 4`; each is `90 deg` |
-| time-rate | `duration_s` | `yaw_rate_rad_s=0.35` | `0 < duration_s <= 10.0`; `0.05 <= yaw_rate_rad_s <= 2.09` |
+The ZSL-1 locomotion backend accepts nonzero `|yaw_rate|` from `0.02` through `3.0 rad/s`. Agentech publishes the narrower `0.02..1.0 rad/s` wrapper range. Angle is converted only by the formula above; no measured turn calibration is implied.
 
-### Parameter Notes
+### Reserved TBD parameters
 
-`direction` is relative to the robot's current heading.
-
-`angle_deg` is the commanded rotation angle. It is not final-heading verification.
-
-`angle_percent` uses a full circle as `100%`; `angle_percent=25` maps to `90 deg`.
-
-| `turn_level` | Angle |
-| --- | --- |
-| `1` | `15 deg` |
-| `2` | `30 deg` |
-| `3` | `45 deg` |
-| `4` | `60 deg` |
-| `5` | `90 deg` |
-
-`yaw_rate_rad_s` is measured in rad/s. `duration_s + yaw_rate_rad_s` executes open-loop rotation, and the estimated angle must be converted to degrees: `estimated_angle_deg = duration_s * yaw_rate_rad_s * 180 / pi`. The default `0.35 rad/s` is about `20 deg/s`.
+`angle_percent`, `turn_level`, and `quarter_turns` remain `TBD`: no authoritative mapping for these previously designed aliases was found. Passing one currently returns `rejected(E_TBD_PARAMETER)` before command emission.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK resolves `direction` and the selected profile, executes in-place left/right turn, then sends controlled stop.
+Left resolves to `move(0, 0, +yaw_rate_rad_s)` and right to `move(0, 0, -yaw_rate_rad_s)`. After the resolved duration the SDK sends `move(0, 0, 0)`. Simulation uses the identical signed command trace.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -89,12 +68,7 @@ The SDK resolves `direction` and the selected profile, executes in-place left/ri
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+`status` is `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"`. Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric upstream code remains in the command trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
@@ -102,10 +76,7 @@ SkillResult(status, trace_id, error_code, message)
 
 ```python
 result = Agentech.turn(direction="left")
-result = Agentech.turn(direction="right", angle_deg=45, yaw_rate_rad_s=0.35)
-result = Agentech.turn(direction="left", angle_percent=25)
-result = Agentech.turn(direction="right", turn_level=3)
-result = Agentech.turn(direction="left", quarter_turns=1)
-result = Agentech.turn(direction="right", duration_s=1.0, yaw_rate_rad_s=0.35)
+result = Agentech.turn(direction="right", angle_deg=90, yaw_rate_rad_s=0.5) # pi s
+result = Agentech.turn(direction="left", duration_s=2.0, yaw_rate_rad_s=0.3)
 ```
 <!-- END: Example -->

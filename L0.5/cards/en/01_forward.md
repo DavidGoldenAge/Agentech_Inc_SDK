@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Movement** — Put the Aegis robot dog into standing posture, move forward in the robot body frame for a bounded duration, then stop.
+**L0.5 · Movement** — Send a bounded positive body-frame `vx` command, then send the zero-motion command.
 
-The function scope is an open-loop forward action. The SDK issues the motion command from the provided parameters and ends the action with controlled stop.
+This is an open-loop wrapper around ZSL-1 `move(vx, vy, yaw_rate)`. It does not claim measured distance or odometry completion.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -17,7 +17,6 @@ Agentech.forward(speed_mps: float, duration_s: float)
 Agentech.forward(speed_percent: int, duration_s: float)
 Agentech.forward(speed_level: int, duration_s: float)
 Agentech.forward(pace: str, duration_s: float)
-Agentech.forward(step_count: int, step_rate_hz: float)
 Agentech.forward(distance_m: float, speed_mps: float)
 ```
 <!-- END: Syntax -->
@@ -25,72 +24,53 @@ Agentech.forward(distance_m: float, speed_mps: float)
 <!-- START: Constraints -->
 ## Constraints
 
-1. Each call may use at most one selector: `speed_mps`, `speed_percent`, `speed_level`, `pace`, `step_count`, or `distance_m`.
-2. `distance_m + speed_mps` selects the distance-speed profile; other cross-profile combinations return `rejected(E_PROFILE_MIXED)`.
-3. Out-of-range values return `rejected(E_RANGE)` and are not clamped.
-4. A distance-speed call is rejected when `distance_m / speed_mps > 10.0 s`; distance input cannot bypass the bounded-duration limit.
-5. Every motion attempts controlled stop; emergency stop state takes precedence.
+1. Select exactly one speed representation: `speed_mps`, `speed_percent`, `speed_level`, or `pace`. `distance_m` may be paired only with `speed_mps`.
+2. Mixed speed representations return `rejected(E_PROFILE_MIXED)`.
+3. Values outside the published range return `rejected(E_RANGE)`; the SDK does not clamp them.
+4. A distance call is accepted only when `distance_m / speed_mps <= 10.0 s`.
+5. ZSL-1 `move` may be entered only from standing state.
+6. The same profile resolver must be used by robot and simulator backends.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
+| Call | Deterministic resolution |
 | --- | --- |
-| `Agentech.forward()` | Equivalent to `Agentech.forward(speed_mps=0.4, duration_s=1.0)` |
-| `Agentech.forward(speed_mps=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.forward(speed_percent=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.forward(speed_level=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.forward(pace=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.forward(step_count=...)` | `step_rate_hz` defaults to `1.5`; `gait` defaults to `"auto"` |
-| `Agentech.forward(distance_m=...)` | `speed_mps` defaults to `0.4` |
+| `Agentech.forward()` | `speed_mps=0.4`, `duration_s=1.0` |
+| Any speed selector without `duration_s` | `duration_s=1.0` |
+| `Agentech.forward(distance_m=...)` | `speed_mps=0.4`; duration is `distance_m / 0.4` |
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-### Parameter Profiles
+| Profile | Range / values | Resolution to speed |
+| --- | --- | --- |
+| `speed_mps` | `0.05 <= speed_mps <= 1.0` | unchanged |
+| `speed_percent` | integer `5..100` | `speed_percent / 100 * 1.0 m/s` |
+| `speed_level` | integer `1..5` | `{1:0.2, 2:0.4, 3:0.6, 4:0.8, 5:1.0} m/s` |
+| `pace` | `"slow"`, `"normal"`, `"fast"` | `{slow:0.2, normal:0.4, fast:0.8} m/s` |
+| `distance_m` | `0 < distance_m <= 5.0` | duration = `distance_m / speed_mps` |
+| `duration_s` | `0 < duration_s <= 10.0` | command duration |
 
-| Profile | Selector | Auxiliary / Default | Range / Rule |
-| --- | --- | --- | --- |
-| speed-time | `speed_mps` | `duration_s=1.0` | `0.05 <= speed_mps <= 1.0`; `0 < duration_s <= 10.0` |
-| percent-time | `speed_percent` | `duration_s=1.0` | `5 <= speed_percent <= 100`, relative to the Agentech public safe maximum |
-| level-time | `speed_level` | `duration_s=1.0` | `speed_level` is `1`, `2`, `3`, `4`, or `5` |
-| pace-time | `pace` | `duration_s=1.0` | `pace` is `"slow"`, `"normal"`, or `"fast"` |
-| steps | `step_count` | `gait="auto"`, `step_rate_hz=1.5` | `1 <= step_count <= 20`; `0.5 <= step_rate_hz <= 3.0` |
-| distance-speed | `distance_m` | `speed_mps=0.4` | `0 < distance_m <= 5.0`; `0.05 <= speed_mps <= 1.0`; `distance_m / speed_mps <= 10.0` |
+The ZSL-1 backend accepts nonzero `|vx|` from `0.05` through `3.0 m/s`. Agentech publishes the narrower `0.05..1.0 m/s` wrapper range. `speed_percent`, `speed_level`, and `pace` are Agentech aliases with the exact mappings above; they are not upstream ZSL-1 parameters or measured speeds.
 
-### Parameter Notes
+### Reserved TBD parameters
 
-The authoritative limit source is `profiles/aegis/zsl1.yaml`.
-
-The Agentech public safe maximum is currently `1.0 m/s`. The upstream ZSL-1 `vx` command envelope permits nonzero magnitudes from `0.05 m/s` through `3.0 m/s`. The public safe maximum is a provisional software limit, not the upstream hardware-command maximum or a measured full-speed claim.
-
-`speed_percent=100` maps to the `1.0 m/s` public safe maximum. Values below `5%` are rejected because they would fall below the upstream minimum nonzero `vx` command.
-
-| `speed_level` | Speed |
+| Previously designed field | Status |
 | --- | --- |
-| `1` | `0.2 m/s` |
-| `2` | `0.4 m/s` |
-| `3` | `0.6 m/s` |
-| `4` | `0.8 m/s` |
-| `5` | `1.0 m/s` |
+| `step_count` | `TBD` — no ZSL-1 step-count command or conversion source found |
+| `step_rate_hz` | `TBD` — no ZSL-1 step-rate parameter found |
+| `gait` | `TBD` — no ZSL-1 gait selector found |
 
-| `pace` | Speed |
-| --- | --- |
-| `"slow"` | `0.2 m/s` |
-| `"normal"` | `0.4 m/s` |
-| `"fast"` | `0.8 m/s` |
-
-`step_count` requests a number of steps. It is not a distance guarantee.
-
-`distance_m` is converted to duration by `distance_m / speed_mps`. This is an open-loop estimate, not odometry confirmation.
+These fields remain reserved for compatibility planning. Passing any of them currently returns `rejected(E_TBD_PARAMETER)` before a robot or simulator command is emitted.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK resolves the selected profile, puts the robot into a standing motion-ready state, executes forward motion, then sends controlled stop. The call blocks until completion, rejection, preemption, emergency stop, or timeout.
+After the robot is motion-ready, the resolved command is `move(+speed_mps, 0, 0)`. At the resolved duration the SDK sends `move(0, 0, 0)`. A simulator must receive these same numeric commands and timing; it must not reinterpret a level or pace independently.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -100,24 +80,15 @@ The SDK resolves the selected profile, puts the robot into a standing motion-rea
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+`status` is `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"`. Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric upstream code remains in the command trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
 ## Example
 
 ```python
-result = Agentech.forward()
-result = Agentech.forward(speed_mps=0.4, duration_s=1.0)
-result = Agentech.forward(speed_percent=40, duration_s=1.0)
-result = Agentech.forward(speed_level=3, duration_s=1.0)
-result = Agentech.forward(pace="fast", duration_s=1.0)
-result = Agentech.forward(step_count=4, step_rate_hz=1.5)
-result = Agentech.forward(distance_m=0.5, speed_mps=0.4)
+result = Agentech.forward(speed_level=3, duration_s=1.0)  # move(+0.6, 0, 0)
+result = Agentech.forward(pace="fast", duration_s=1.0)   # move(+0.8, 0, 0)
+result = Agentech.forward(distance_m=0.5, speed_mps=0.25) # 2.0 s
 ```
 <!-- END: Example -->

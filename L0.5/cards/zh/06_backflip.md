@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## 定义
 
-**L0.5 · Movement** — 执行一次已批准的 Aegis 后空翻动作 profile。
+**L0.5 · 离散动作** — 请求 ZSL-1 `backflip()` 动作；请求被接受后可由 Agentech 主机额外等待。
 
-这是高风险预置动作接口。SDK 只允许调用经过安全审核和设备标定的动作变体。
+ZSL-1 把后空翻公开为无参数离散动作，而不是可调轨迹。
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -13,50 +13,41 @@
 
 ```python
 Agentech.backflip()
-Agentech.backflip(variant: str)
-Agentech.backflip(variant: str, stabilize_s: float)
+Agentech.backflip(stabilize_s: float)
 ```
 <!-- END: Syntax -->
 
 <!-- START: Constraints -->
 ## 约束
 
-1. `variant` 只能使用已批准的动作变体；未知变体返回 `rejected(E_UNSUPPORTED)`。
-2. 执行动作前必须通过 SafetyGate；未通过返回 `rejected(E_SAFETY_GATE)`。
-3. `stabilize_s` 是动作结束后的等待时间，不代表恢复验证。
-4. 不自动重试。失败后由上层决定恢复流程。
+1. 上游动作不接受高度、速度、样式或轨迹参数。
+2. ZSL-1 只允许从站立状态切入，移动中禁止切换。
+3. 上游文档明确警告：高频使用会加速电机和关节磨损，并可能降低性能或缩短寿命。
+4. `stabilize_s` 是 Agentech 主机等待时间，绝不传给 `backflip()`。
+5. 越界值返回 `rejected(E_RANGE)`；上游状态转换拒绝会直接返回，不自动重试。
+6. 成功只表示上游请求成功且主机等待结束，不代表通过实测姿态证明动作完成。
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## 默认设定
 
-| 调用 | 默认反应 |
-| --- | --- |
-| `Agentech.backflip()` | 等价于 `Agentech.backflip(variant="standard", stabilize_s=5.0)` |
-| `Agentech.backflip(variant=...)` | `stabilize_s` 默认 `5.0` |
+`Agentech.backflip()` 等同于 `Agentech.backflip(stabilize_s=4.0)`。`4.0 s` 来自上游示例的调用等待，不是硬件参数，也不是实测动作时长。
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## 参数
 
-| 参数 | 默认值 | 范围 / 规则 | 说明 |
-| --- | --- | --- | --- |
-| `variant` | `"standard"` | 已批准变体 | 选择一个预置后空翻动作 profile。 |
-| `stabilize_s` | `5.0` | `0 <= stabilize_s <= 10.0` | 动作结束后的稳定等待时间。 |
+| 参数 | 默认值 | 范围 | 含义 |
+| --- | ---: | --- | --- |
+| `stabilize_s` | `4.0` | `0 <= stabilize_s <= 10.0` | 动作请求被接受后的主机侧等待时间。 |
 
-### 参数解释
-
-`variant` 是动作 profile 名，不是风格自由文本。未知变体必须拒绝，不能回退到默认动作。
-
-`stabilize_s` 只是等待窗口。它不检查机器人是否真正恢复到可继续任务的状态。
-
-SafetyGate 至少应检查急停状态、电量、姿态、地面/空间条件、设备能力和当前是否允许执行高风险动作。
+原有 `variant` 参数保留为 `TBD`；ZSL-1 没有公开后空翻样式选择。当前传入该字段会在调用 `backflip()` 前返回 `rejected(E_TBD_PARAMETER)`。
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## 行为
 
-SDK 会先执行 SafetyGate，然后触发一次后空翻动作 profile。动作结束后等待 `stabilize_s`，再返回结果。
+真机后端无参数调用 `backflip()`，记录返回码；请求成功后再等待 `stabilize_s`。模拟器发出同一个无参数动作事件，并执行相同主机等待。
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -66,12 +57,7 @@ SDK 会先执行 SafetyGate，然后触发一次后空翻动作 profile。动作
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| 字段 | 含义 |
-| --- | --- |
-| `status` | 本次调用的最终状态：`"succeeded"`、`"rejected"`、`"preempted"`、`"estopped"` 或 `"timeout"` |
-| `trace_id` | 用来关联 SDK 日志和设备日志的命令 ID |
-| `error_code` | 成功时为 `None`；失败时返回稳定错误码 |
-| `message` | 给开发者看的错误或状态说明，不建议用于程序分支判断 |
+包括状态转换和电机故障在内的上游返回码按 `profiles/aegis/zsl1.yaml` 翻译，原始数值保留在 trace 中。
 <!-- END: Return -->
 
 <!-- START: Example -->
@@ -79,6 +65,6 @@ SkillResult(status, trace_id, error_code, message)
 
 ```python
 result = Agentech.backflip()
-result = Agentech.backflip(variant="standard", stabilize_s=5.0)
+result = Agentech.backflip(stabilize_s=4.0)
 ```
 <!-- END: Example -->

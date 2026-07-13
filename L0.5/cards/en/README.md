@@ -2,7 +2,7 @@
 
 This directory is the English reading entry for Agentech L0.5 SDK cards.
 
-Use these cards when you need the English API contract for bounded atomic Aegis robot-dog skills: movement, posture, safety, and sensing/posture adjustment.
+Use these cards when you need the English API contract for bounded atomic Aegis robot-dog skills that compile deterministically to the ZSL-1 high-level API.
 
 ## What This Language Pack Contains
 
@@ -32,7 +32,7 @@ Use these cards when you need the English API contract for bounded atomic Aegis 
 | 09 | `Agentech.sit(parameters)` | Posture | `09_sit.md` |
 | 10 | `Agentech.stop(parameters)` | Safety | `10_stop.md` |
 | 11 | `Agentech.emergency_stop(parameters)` | Safety | `11_emergency_stop.md` |
-| 12 | `Agentech.look(parameters)` | Sensing/Posture | `12_look.md` |
+| 12 | `Agentech.look(parameters)` | Posture | `12_look.md` |
 
 ## How To Read A Card
 
@@ -45,10 +45,10 @@ Read each card in this order:
 5. `Parameters`: check ranges, units, mappings, and engineering notes.
 6. `Behavior`: understand runtime execution.
 7. `Return`: branch on stable return fields.
-8. `Example`: use concrete values from real calls.
+8. `Example`: inspect concrete values and the resulting bottom-level command.
 
 ## English Style Contract
 
-English cards use concise engineering language. The text should make the public API clear without exposing internal controller details, device-specific implementation names, or undocumented recovery logic.
+English cards use concise engineering language. Bottom-level ZSL-1 methods, units, signs, ranges, and software-only mappings are explicit so robot and simulator backends can share one resolver. Undocumented device behavior is not invented.
 
 All Python SDK parameters use `snake_case`, and `Syntax` shows parameter names and types only. Concrete values belong in `Example`.

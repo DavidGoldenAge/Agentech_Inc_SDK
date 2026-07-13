@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Movement** — Put the Aegis robot dog into standing posture, sidestep left or right in the robot body frame for a bounded duration, then stop.
+**L0.5 · Movement** — Send a bounded body-frame `vy` command to the left or right, then send the zero-motion command.
 
-The function scope is an open-loop lateral action. Direction is interpreted in the robot's current body frame.
+This is an open-loop wrapper around ZSL-1 `move(vx, vy, yaw_rate)`.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -16,7 +16,6 @@ Agentech.lateral(direction: str)
 Agentech.lateral(direction: str, speed_mps: float, duration_s: float)
 Agentech.lateral(direction: str, speed_percent: int, duration_s: float)
 Agentech.lateral(direction: str, speed_level: int, duration_s: float)
-Agentech.lateral(direction: str, step_count: int, step_rate_hz: float)
 Agentech.lateral(direction: str, distance_m: float, speed_mps: float)
 ```
 <!-- END: Syntax -->
@@ -24,68 +23,53 @@ Agentech.lateral(direction: str, distance_m: float, speed_mps: float)
 <!-- START: Constraints -->
 ## Constraints
 
-1. `direction` is required and must be `"left"` or `"right"`; it is not a profile selector.
-2. Each call may use at most one selector: `speed_mps`, `speed_percent`, `speed_level`, `step_count`, or `distance_m`.
-3. `distance_m + speed_mps` selects the distance-speed profile; other cross-profile combinations return `rejected(E_PROFILE_MIXED)`.
-4. Out-of-range values return `rejected(E_RANGE)`.
-5. A distance-speed call is rejected when `distance_m / speed_mps > 10.0 s`; distance input cannot bypass the bounded-duration limit.
-6. Every sidestep attempts controlled stop; emergency stop state takes precedence.
+1. `direction` is `"left"` or `"right"`; speed inputs are positive magnitudes.
+2. Select exactly one speed representation: `speed_mps`, `speed_percent`, or `speed_level`. `distance_m` may be paired only with `speed_mps`.
+3. Mixed speed representations return `rejected(E_PROFILE_MIXED)`; out-of-range values return `rejected(E_RANGE)`.
+4. A distance call is accepted only when `distance_m / speed_mps <= 10.0 s`.
+5. ZSL-1 `move` may be entered only from standing state.
+6. The same profile resolver must be used by robot and simulator backends.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
+| Call | Deterministic resolution |
 | --- | --- |
-| `Agentech.lateral(direction=...)` | Equivalent to `Agentech.lateral(direction=..., speed_mps=0.2, duration_s=1.0)` |
-| `Agentech.lateral(direction=..., speed_mps=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.lateral(direction=..., speed_percent=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.lateral(direction=..., speed_level=...)` | `duration_s` defaults to `1.0` |
-| `Agentech.lateral(direction=..., step_count=...)` | `step_rate_hz` defaults to `1.5`; `gait` defaults to `"auto"` |
-| `Agentech.lateral(direction=..., distance_m=...)` | `speed_mps` defaults to `0.2` |
+| `Agentech.lateral(direction=...)` | `speed_mps=0.2`, `duration_s=1.0` |
+| Any speed selector without `duration_s` | `duration_s=1.0` |
+| `Agentech.lateral(direction=..., distance_m=...)` | `speed_mps=0.2`; duration is `distance_m / 0.2` |
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-### Parameter Profiles
+| Parameter/profile | Range / values | Resolution |
+| --- | --- | --- |
+| `direction` | `"left"`, `"right"` | left = positive `vy`; right = negative `vy` |
+| `speed_mps` | `0.1 <= speed_mps <= 0.5` | unchanged |
+| `speed_percent` | integer `20..100` | `speed_percent / 100 * 0.5 m/s` |
+| `speed_level` | integer `1..5` | `{1:0.1, 2:0.2, 3:0.3, 4:0.4, 5:0.5} m/s` |
+| `distance_m` | `0 < distance_m <= 2.0` | duration = `distance_m / speed_mps` |
+| `duration_s` | `0 < duration_s <= 10.0` | command duration |
 
-| Profile | Selector | Auxiliary / Default | Range / Rule |
-| --- | --- | --- | --- |
-| direction | - | `direction` required | `"left"` or `"right"` |
-| speed-time | `speed_mps` | `duration_s=1.0` | `0.1 <= speed_mps <= 0.5`; `0 < duration_s <= 10.0` |
-| percent-time | `speed_percent` | `duration_s=1.0` | `20 <= speed_percent <= 100`, relative to the Agentech public safe maximum |
-| level-time | `speed_level` | `duration_s=1.0` | `speed_level` is `1`, `2`, `3`, `4`, or `5` |
-| steps | `step_count` | `gait="auto"`, `step_rate_hz=1.5` | `1 <= step_count <= 10`; `0.5 <= step_rate_hz <= 3.0` |
-| distance-speed | `distance_m` | `speed_mps=0.2` | `0 < distance_m <= 2.0`; `0.1 <= speed_mps <= 0.5`; `distance_m / speed_mps <= 10.0` |
+The ZSL-1 backend accepts nonzero `|vy|` from `0.1` through `1.0 m/s`. Agentech publishes the narrower `0.1..0.5 m/s` wrapper range. Percentage and level are deterministic Agentech mappings, not upstream parameters or measured speeds.
 
-### Parameter Notes
+### Reserved TBD parameters
 
-`direction` uses the robot body frame.
-
-The authoritative limit source is `profiles/aegis/zsl1.yaml`.
-
-The Agentech public safe maximum is currently `0.5 m/s`. The upstream ZSL-1 `vy` command envelope permits nonzero magnitudes from `0.1 m/s` through `1.0 m/s`. The public safe maximum is a provisional software limit, not the upstream hardware-command maximum or a measured full-speed claim.
-
-`speed_percent=100` maps to the `0.5 m/s` public safe maximum. Values below `20%` are rejected because they would fall below the upstream minimum nonzero `vy` command.
-
-| `speed_level` | Speed |
+| Previously designed field | Status |
 | --- | --- |
-| `1` | `0.1 m/s` |
-| `2` | `0.2 m/s` |
-| `3` | `0.3 m/s` |
-| `4` | `0.4 m/s` |
-| `5` | `0.5 m/s` |
+| `step_count` | `TBD` — no ZSL-1 step-count command or conversion source found |
+| `step_rate_hz` | `TBD` — no ZSL-1 step-rate parameter found |
+| `gait` | `TBD` — no ZSL-1 gait selector found |
 
-`step_count` requests a number of sidesteps. It is not a lateral-distance guarantee.
-
-`distance_m` is converted to duration by `distance_m / speed_mps`. This is an open-loop estimate, not lateral-position confirmation.
+Passing a TBD field currently returns `rejected(E_TBD_PARAMETER)` before any command is emitted.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK resolves `direction` and the selected profile, puts the robot into a standing motion-ready state, executes left/right sidestep, then sends controlled stop.
+Left resolves to `move(0, +speed_mps, 0)` and right to `move(0, -speed_mps, 0)`. At the resolved duration the SDK sends `move(0, 0, 0)`. A simulator must receive these same numeric commands and timing.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -95,23 +79,15 @@ The SDK resolves `direction` and the selected profile, puts the robot into a sta
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+`status` is `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"`. Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric upstream code remains in the command trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
 ## Example
 
 ```python
-result = Agentech.lateral(direction="left")
-result = Agentech.lateral(direction="right", speed_mps=0.2, duration_s=1.0)
-result = Agentech.lateral(direction="left", speed_percent=40, duration_s=1.0)
-result = Agentech.lateral(direction="left", speed_level=3, duration_s=1.0)
-result = Agentech.lateral(direction="left", step_count=2, step_rate_hz=1.5)
-result = Agentech.lateral(direction="right", distance_m=0.3, speed_mps=0.2)
+result = Agentech.lateral(direction="left", speed_level=3, duration_s=1.0)    # move(0, +0.3, 0)
+result = Agentech.lateral(direction="right", speed_percent=40, duration_s=1) # move(0, -0.2, 0)
+result = Agentech.lateral(direction="left", distance_m=0.4, speed_mps=0.2)   # 2.0 s
 ```
 <!-- END: Example -->

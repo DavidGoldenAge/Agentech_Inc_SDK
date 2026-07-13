@@ -7,14 +7,14 @@ The purpose of this repository is to make every SDK capability readable by two a
 - developers who need clear function contracts before writing code;
 - code-generation agents that need stable, machine-readable sections before calling an SDK function.
 
-Current version: `0.2.0`
+Current version: `0.3.0`
 
 ## Current Scope
 
 | Layer | Count | Responsibility | Entry |
 | --- | ---: | --- | --- |
 | `L0.0` | 1 | Direct telemetry snapshot reads | `L0.0/` |
-| `L0.5` | 12 | Bounded atomic movement, posture, safety, and sensing/posture skills | `L0.5/` |
+| `L0.5` | 12 | Bounded atomic movement, discrete-action, posture, and safety skills | `L0.5/` |
 
 Language entry points:
 
@@ -37,6 +37,7 @@ The design goal is small, stable, composable capability descriptions:
 | No hidden defaults | `Defaults` states exactly what happens when optional parameters are omitted. |
 | Stable failure model | `Constraints` and `Return` describe rejection, timeout, preemption, and emergency-stop behavior. |
 | Machine extraction | HTML comments mark every card section so tools can extract modules reliably. |
+| One parameter truth | `profiles/aegis/zsl1.yaml` holds upstream limits and every Agentech mapping used by robot and simulator backends. |
 
 ## Layer Model
 
@@ -55,14 +56,14 @@ Agentech SDK uses level folders to keep responsibility boundaries explicit.
 
 | Path | Content |
 | --- | --- |
-| `L0.0/README.md` | L0.0 package index |
 | `L0.0/cards/` | English and Chinese L0.0 telemetry cards |
-| `L0.5/README.md` | L0.5 package index |
 | `L0.5/cards/en/README.md` | English reading entry |
 | `L0.5/cards/en/` | English L0.5 cards |
 | `L0.5/cards/zh/README.md` | Chinese reading entry |
 | `L0.5/cards/zh/` | Chinese L0.5 cards |
 | `manifest.json` | Repository-level card index |
+| `profiles/aegis/zsl1.yaml` | ZSL-1 limits, methods, signs, wrapper mappings, and unresolved TBD fields |
+| `scripts/validate_sdk_contract.rb` | Contract and cross-card consistency checks |
 | `version history.md` | Version history |
 
 ## Card Anatomy
@@ -119,8 +120,8 @@ Python SDK parameters use `snake_case`.
 | --- | --- |
 | `speed_mps` | Speed in meters per second |
 | `duration_s` | Duration in seconds |
-| `speed_percent` | Product-calibrated speed percentage |
-| `step_rate_hz` | Step rate in hertz |
+| `speed_percent` | Deterministic percentage of the public wrapper maximum |
+| `yaw_rate_rad_s` | Yaw-rate magnitude in radians per second |
 
 ## Parameter Profiles
 
@@ -130,7 +131,7 @@ A parameter profile is one supported way to express the same SDK action. A selec
 Agentech.forward(speed_percent=40, duration_s=1.0)
 ```
 
-In this call, `speed_percent` selects the `percent-time` profile and `duration_s` configures that profile.
+In this call, `speed_percent` selects the percent-time profile and resolves by the formula in `profiles/aegis/zsl1.yaml`; `duration_s` configures the command time.
 
 Mixed selectors are rejected:
 
@@ -139,3 +140,9 @@ Agentech.forward(speed_percent=40, speed_level=3)
 ```
 
 This returns `rejected(E_PROFILE_MIXED)`.
+
+Aliases such as `speed_level` and `pace` are Agentech product inputs. They are accepted only where the profile defines a complete numeric mapping. They are not presented as Agibot parameters or measured robot performance. Physical and simulation backends must consume the same resolved bottom-level command trace.
+
+## TBD Parameter Policy
+
+Previously designed parameters are not erased merely because the current Agibot source does not define them. They remain visible as `TBD`, without invented defaults, ranges, or simulator behavior. Passing a TBD parameter returns `rejected(E_TBD_PARAMETER)` before any backend command is emitted. The central list is `profiles/aegis/zsl1.yaml` under `tbd_policy`.

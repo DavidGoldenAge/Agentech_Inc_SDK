@@ -61,6 +61,10 @@ Agentech.get_battery_status(timeout_s: float)
 `timeout_s` 控制 SDK 等待底层遥测响应的时间窗口。
 
 上游数据源是 ZSL-1 `getBatteryPower()`。电机状态中的电压或温度标志不能当作电池包遥测公开。
+
+### 保留的 TBD 字段
+
+`voltage_v`、`current_a`、`temperature_c`、`is_charging` 继续保留在 SDK 设计中并标记为 `TBD`。ZSL-1 `getBatteryPower()` 不提供这些值，因此当前不返回，模拟器也不得合成。未来若 `fields` 请求包含其中任一字段，在定义权威数据源之前必须返回 `rejected(E_TBD_PARAMETER)`。
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->

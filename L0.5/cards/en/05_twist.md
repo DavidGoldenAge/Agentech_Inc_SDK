@@ -3,9 +3,9 @@
 <!-- START: Definition -->
 ## Definition
 
-**L0.5 · Movement** — Apply a bounded left/right body-yaw rate while the Aegis robot dog remains standing, then stop the attitude command.
+**L0.5 · Posture** — Apply a bounded body-yaw posture rate through ZSL-1 `attitudeControl`, optionally hold, and optionally apply the inverse rate for the same duration.
 
-The function wraps the upstream ZSL-1 `attitudeControl(..., yaw_vel, ...)` axis. It adjusts body attitude and is not a locomotion turn or a base-heading command.
+This changes body posture; it is not the locomotion turn command and does not promise an absolute yaw angle.
 <!-- END: Definition -->
 
 <!-- START: Syntax -->
@@ -14,57 +14,49 @@ The function wraps the upstream ZSL-1 `attitudeControl(..., yaw_vel, ...)` axis.
 ```python
 Agentech.twist(direction: str)
 Agentech.twist(direction: str, yaw_rate_rad_s: float, duration_s: float)
-Agentech.twist(
-    direction: str,
-    yaw_rate_rad_s: float,
-    duration_s: float,
-    hold_s: float,
-    return_to_neutral: bool,
-)
+Agentech.twist(direction: str, yaw_rate_rad_s: float, duration_s: float, hold_s: float, return_to_neutral: bool)
 ```
 <!-- END: Syntax -->
 
 <!-- START: Constraints -->
 ## Constraints
 
-1. `direction` is required and must be `"left"` or `"right"`.
-2. `0.02 <= yaw_rate_rad_s <= 0.2`. This is the Agentech public soft range; the upstream attitude-yaw hard range is `0.0–0.5 rad/s` by magnitude.
-3. `0 < duration_s <= 2.0` and `0 <= hold_s <= 3.0`.
-4. The wrapper converts `direction` to the sign of upstream `yaw_vel`; callers always pass a positive magnitude.
-5. Out-of-range values return `rejected(E_RANGE)` and are not clamped.
-6. This API does not accept `angle_deg`: ZSL-1 documents attitude velocity, not an absolute body-yaw mechanical limit.
+1. `direction` is `"left"` or `"right"`; `yaw_rate_rad_s` is a positive magnitude.
+2. This API accepts rate and duration only; absolute body-yaw limits are not documented by ZSL-1.
+3. Out-of-range values return `rejected(E_RANGE)`; the SDK does not clamp them.
+4. `return_to_neutral=True` means an equal-duration inverse-rate command, not closed-loop absolute-pose recovery.
+5. ZSL-1 `attitudeControl` may be entered only from standing state.
+6. Robot and simulator backends must execute the same `attitudeControl` command sequence.
 <!-- END: Constraints -->
 
 <!-- START: Defaults -->
 ## Defaults
 
-| Call | Default behavior |
-| --- | --- |
-| `Agentech.twist(direction=...)` | Equivalent to `Agentech.twist(direction=..., yaw_rate_rad_s=0.2, duration_s=0.5, hold_s=0, return_to_neutral=True)` |
-| `Agentech.twist(direction=..., yaw_rate_rad_s=...)` | `duration_s` defaults to `0.5`; `hold_s` defaults to `0`; `return_to_neutral` defaults to `True` |
-| `Agentech.twist(direction=..., duration_s=...)` | `yaw_rate_rad_s` defaults to `0.2`; `hold_s` defaults to `0`; `return_to_neutral` defaults to `True` |
+`Agentech.twist(direction=...)` resolves to `yaw_rate_rad_s=0.2`, `duration_s=0.5`, `hold_s=0.0`, and `return_to_neutral=True`.
 <!-- END: Defaults -->
 
 <!-- START: Parameters -->
 ## Parameters
 
-| Parameter | Default | Range / Rule | Description |
-| --- | --- | --- | --- |
-| `direction` | required | `"left"` or `"right"` | Selects the sign of the upstream attitude `yaw_vel` command. |
-| `yaw_rate_rad_s` | `0.2` | `0.02–0.2 rad/s` | Positive body-yaw rate magnitude exposed by the Agentech public API. |
-| `duration_s` | `0.5` | `0 < duration_s <= 2.0` | Time for which the nonzero attitude-yaw command is applied. |
-| `hold_s` | `0` | `0 <= hold_s <= 3.0` | Optional wait after the nonzero rate command stops. |
-| `return_to_neutral` | `True` | boolean | Requests the Agentech wrapper to return body yaw to neutral using attitude feedback. |
+| Parameter | Default | Range / values |
+| --- | ---: | --- |
+| `direction` | required | `"left"` or `"right"` |
+| `yaw_rate_rad_s` | `0.2` | `0.02 <= yaw_rate_rad_s <= 0.2` |
+| `duration_s` | `0.5` | `0 < duration_s <= 2.0` |
+| `hold_s` | `0.0` | `0 <= hold_s <= 3.0` |
+| `return_to_neutral` | `True` | boolean |
 
-The authoritative limit source is `profiles/aegis/zsl1.yaml`. ZSL-1 permits attitude `yaw_vel` through `0.5 rad/s` by magnitude. Agentech applies a conservative `0.2 rad/s` public soft maximum. The `3.0 rad/s` locomotion yaw limit belongs to `move(...)`/`turn(...)` and must not be used here.
+The upstream attitude yaw-rate envelope is `-0.5..+0.5 rad/s`. Agentech publishes a narrower magnitude range of `0.02..0.2 rad/s`; these are software contract values, not measured posture angles.
 
-`return_to_neutral=True` is an Agentech wrapper behavior, not a native parameter of `attitudeControl`. It requires body-attitude feedback; if that capability is unavailable, the call returns `rejected(E_CAPABILITY_UNAVAILABLE)` rather than estimating an absolute angle from time alone.
+### Reserved TBD parameters
+
+`angle_deg`, `angle_percent`, and `twist_level` remain `TBD` because ZSL-1 does not publish the absolute body-yaw limit or a mapping for those previously designed inputs. Passing one currently returns `rejected(E_TBD_PARAMETER)` before command emission.
 <!-- END: Parameters -->
 
 <!-- START: Behavior -->
 ## Behavior
 
-The SDK verifies standing state, converts `direction` to signed attitude `yaw_vel`, applies that command for `duration_s`, then sends zero attitude yaw rate. It waits for `hold_s` and returns to neutral when requested and supported. The call blocks until completion, rejection, preemption, emergency stop, or timeout.
+Left sends `attitudeControl(0, 0, +rate, 0)` and right sends `attitudeControl(0, 0, -rate, 0)` for `duration_s`, followed by zeros. After `hold_s`, `return_to_neutral=True` sends the opposite signed rate for the same duration and then zeros. Simulation uses the identical sequence.
 <!-- END: Behavior -->
 
 <!-- START: Return -->
@@ -74,12 +66,7 @@ The SDK verifies standing state, converts `direction` to signed attitude `yaw_ve
 SkillResult(status, trace_id, error_code, message)
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `status` | Final call state: `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"` |
-| `trace_id` | Command ID used to correlate SDK logs and device logs |
-| `error_code` | `None` on success; stable error code on failure |
-| `message` | Developer-facing detail; do not branch program logic on this string |
+`status` is `"succeeded"`, `"rejected"`, `"preempted"`, `"estopped"`, or `"timeout"`. Upstream return codes are translated through `profiles/aegis/zsl1.yaml`; the numeric upstream code remains in the command trace.
 <!-- END: Return -->
 
 <!-- START: Example -->
@@ -87,17 +74,7 @@ SkillResult(status, trace_id, error_code, message)
 
 ```python
 result = Agentech.twist(direction="left")
-result = Agentech.twist(
-    direction="right",
-    yaw_rate_rad_s=0.15,
-    duration_s=0.5,
-)
-result = Agentech.twist(
-    direction="left",
-    yaw_rate_rad_s=0.2,
-    duration_s=0.5,
-    hold_s=0.5,
-    return_to_neutral=True,
-)
+result = Agentech.twist(direction="right", yaw_rate_rad_s=0.1, duration_s=1.0)
+result = Agentech.twist(direction="left", yaw_rate_rad_s=0.15, duration_s=0.5, hold_s=1.0, return_to_neutral=True)
 ```
 <!-- END: Example -->
