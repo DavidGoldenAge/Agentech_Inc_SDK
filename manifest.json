@@ -28,7 +28,6 @@
   "structure": {
     "path_order": [
       "layer",
-      "cards",
       "robot",
       "language",
       "category",
@@ -53,7 +52,7 @@
       "configuration"
     ],
     "unclassified_path_template": "Unclassify/<language>/<card>.md",
-    "card_path_template": "L<level>/cards/<robot>/<language>/<category>/<card>.md",
+    "card_path_template": "L<level>/<robot>/<language>/<category>/<card>.md",
     "ff.master_status": "testing_not_started"
   },
   "entrypoints": {
