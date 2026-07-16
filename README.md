@@ -29,14 +29,14 @@ until card-by-card classification begins.
 Formal classified cards will use:
 
 ```text
-<Layer>/cards/<robot>/<language>/<website-category>/<card>.md
+<Layer>/<robot>/<language>/<website-category>/<card>.md
 ```
 
 Example:
 
 ```text
-L0.5/cards/ff.navi/En/athletics/jump_forward.md
-L0.5/cards/ff.navi/Ch/athletics/jump_forward.md
+L0.5/ff.navi/En/athletics/jump_forward.md
+L0.5/ff.navi/Ch/athletics/jump_forward.md
 ```
 
 ## SDK Layers
