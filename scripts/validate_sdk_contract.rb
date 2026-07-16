@@ -119,10 +119,8 @@ assert(public_contract.dig("emergency_stop", "backend_method") == "passive", "em
 
 expected_modules = %w[Definition Syntax Constraints Defaults Parameters Behavior Return Example]
 card_files = Dir[
-  ROOT.join("L0.5/cards/Unclassify/En/*.md").to_s,
-  ROOT.join("L0.5/cards/Unclassify/Ch/*.md").to_s,
-  ROOT.join("L0.0/cards/Unclassify/En/*.md").to_s,
-  ROOT.join("L0.0/cards/Unclassify/Ch/*.md").to_s
+  ROOT.join("Unclassify/En/*.md").to_s,
+  ROOT.join("Unclassify/Ch/*.md").to_s
 ].reject { |path| path.end_with?("README.md") }.sort
 assert(card_files.length == 26, "expected 26 bilingual card files, found #{card_files.length}")
 
@@ -139,9 +137,10 @@ manifests = {
   "L0.5" => JSON.parse(ROOT.join("L0.5/manifest.json").read)
 }
 manifests.each do |package, manifest|
+  path_base = manifest.dig("structure", "path_base") == "repository_root" ? ROOT : ROOT.join(package)
   manifest.fetch("cards").each do |card|
     card.fetch("paths").each_value do |relative_path|
-      path = ROOT.join(package, relative_path)
+      path = path_base.join(relative_path)
       assert(path.file?, "manifest path does not exist: #{path.relative_path_from(ROOT)}")
       heading = path.each_line.first
       assert(heading.include?(card.fetch("function")), "#{path.relative_path_from(ROOT)} heading does not match manifest function")
@@ -175,14 +174,14 @@ tbd_card_paths = {
 tbd_policy.fetch("parameters").each do |card_name, fields|
   paths = if card_name == "battery_fields"
             %w[
-              L0.0/cards/Unclassify/En/get_battery_status.en.md
-              L0.0/cards/Unclassify/Ch/get_battery_status.zh.md
+              Unclassify/En/get_battery_status.en.md
+              Unclassify/Ch/get_battery_status.zh.md
             ]
           else
             filename = tbd_card_paths.fetch(card_name)
             [
-              "L0.5/cards/Unclassify/En/#{filename}",
-              "L0.5/cards/Unclassify/Ch/#{filename}"
+              "Unclassify/En/#{filename}",
+              "Unclassify/Ch/#{filename}"
             ]
           end
 
@@ -211,7 +210,7 @@ callable_tbd_patterns = {
 }
 callable_tbd_patterns.each do |filename, patterns|
   %w[En Ch].each do |language|
-    text = ROOT.join("L0.5/cards/Unclassify", language, filename).read
+    text = ROOT.join("Unclassify", language, filename).read
     patterns.each do |pattern|
       assert(!text.include?(pattern), "#{filename} makes TBD field callable: #{pattern}")
     end
@@ -220,7 +219,7 @@ end
 
 root_manifest = JSON.parse(ROOT.join("manifest.json").read)
 assert(root_manifest.fetch("version") == profile.fetch("sdk_version"), "root manifest and profile versions differ")
-assert(!ROOT.join("L0.5/cards/Unclassify/En/09_lie_down.md").exist?, "compatibility sit card was unexpectedly renamed")
-assert(!ROOT.join("L0.5/cards/Unclassify/En/12_pitch_body.md").exist?, "compatibility look card was unexpectedly renamed")
+assert(!ROOT.join("Unclassify/En/09_lie_down.md").exist?, "compatibility sit card was unexpectedly renamed")
+assert(!ROOT.join("Unclassify/En/12_pitch_body.md").exist?, "compatibility look card was unexpectedly renamed")
 
 puts "SDK contract valid: #{card_files.length} cards, deterministic mappings, and preserved TBD fields."
